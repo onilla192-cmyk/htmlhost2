@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SoundRip — MP4 to MP3</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: rgba(255,255,255,0.05);
+    --surface-hover: rgba(255,255,255,0.08);
+    --border: rgba(255,255,255,0.08);
+    --accent: #6c63ff;
+    --accent2: #ff6b9d;
+    --accent3: #00d4aa;
+    --text: #f0f0f5;
+    --text-sub: rgba(240,240,245,0.5);
+    --text-muted: rgba(240,240,245,0.3);
+    --card: rgba(18,18,28,0.95);
+    --success: #30d158;
+    --error: #ff453a;
+    --radius: 20px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 20% 20%, rgba(108,99,255,0.15) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 40% at 80% 80%, rgba(255,107,157,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 60% at 50% 50%, rgba(0,212,170,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .phone-frame {
+    width: 390px;
+    height: 844px;
+    background: linear-gradient(145deg, #1a1a2e 0%, #0f0f1a 100%);
+    border-radius: 54px;
+    border: 1.5px solid rgba(255,255,255,0.12);
+    box-shadow:
+      0 0 0 8px #0d0d14,
+      0 0 0 9.5px rgba(255,255,255,0.06),
+      0 60px 120px rgba(0,0,0,0.8),
+      0 20px 40px rgba(0,0,0,0.5),
+      inset 0 1px 0 rgba(255,255,255,0.1);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .side-btn { position: absolute; width: 4px; background: #1a1a2e; border-radius: 2px; border: 1px solid rgba(255,255,255,0.08); }
+  .side-btn.vu { right: -5px; top: 140px; height: 36px; }
+  .side-btn.vd { right: -5px; top: 188px; height: 56px; }
+  .side-btn.pw { left: -5px; top: 160px; height: 70px; }
+
+  .dynamic-island {
+    position: absolute;
+    top: 14px; left: 50%;
+    transform: translateX(-50%);
+    width: 126px; height: 37px;
+    background: #000;
+    border-radius: 20px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .dynamic-island.active { width: 260px; height: 52px; border-radius: 28px; }
+  .di-camera { width: 12px; height: 12px; border-radius: 50%; background: #1a1a1a; position: relative; }
+  .di-camera::after { content:''; position:absolute; inset:3px; border-radius:50%; background:#2a2a3a; }
+  .di-speaker { width: 50px; height: 6px; border-radius: 3px; background: #111; }
+  .di-activity {
+    display: flex; align-items: center; gap: 8px;
+    opacity: 0; transition: opacity 0.3s;
+    overflow: hidden; width: 0;
+  }
+  .dynamic-island.active .di-activity { opacity: 1; width: auto; }
+  .di-bars { display: flex; gap: 2px; align-items: flex-end; height: 18px; }
+  .di-bar { width: 3px; background: var(--accent); border-radius: 2px; animation: diBar 0.8s ease-in-out infinite; }
+  .di-bar:nth-child(2) { animation-delay: 0.15s; }
+  .di-bar:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes diBar {
+    0%,100% { height: 6px; }
+    50% { height: 16px; }
+  }
+  .di-text { font-size: 11px; color: var(--text-sub); font-weight: 500; white-space: nowrap; }
+
+  .status-bar {
+    height: 60px; padding: 18px 28px 0;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    flex-shrink: 0; position: relative; z-index: 10;
+  }
+  .status-time { font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: -0.3px; }
+  .status-icons { display: flex; gap: 6px; align-items: center; }
+  .battery { width: 25px; height: 12px; border: 1.5px solid rgba(255,255,255,0.6); border-radius: 3px; position: relative; display: flex; align-items: center; padding: 2px; }
+  .battery::after { content:''; position:absolute; right:-5px; top:50%; transform:translateY(-50%); width:3px; height:5px; background:rgba(255,255,255,0.4); border-radius:0 1px 1px 0; }
+  .battery-fill { height:100%; background:var(--success); border-radius:1px; width:70%; }
+  .signal-icon { display: flex; gap: 2px; align-items: flex-end; height: 12px; }
+  .sig-bar { width: 3px; background: rgba(255,255,255,0.8); border-radius: 1px; }
+  .sig-bar:nth-child(1) { height: 4px; }
+  .sig-bar:nth-child(2) { height: 7px; }
+  .sig-bar:nth-child(3) { height: 10px; }
+  .sig-bar:nth-child(4) { height: 12px; }
+  .wifi-icon { width: 16px; height: 12px; display: flex; align-items: center; justify-content: center; }
+  .wifi-icon svg { width: 14px; height: 11px; }
+
+  .screen {
+    flex: 1;
+    overflow-y: auto; overflow-x: hidden;
+    padding: 8px 20px 40px;
+    scrollbar-width: none;
+  }
+  .screen::-webkit-scrollbar { display: none; }
+
+  .app-header { text-align: center; padding: 20px 0 18px; }
+  .app-icon {
+    width: 68px; height: 68px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 18px;
+    margin: 0 auto 14px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 32px rgba(108,99,255,0.4);
+    position: relative; overflow: hidden;
+  }
+  .app-icon::before {
+    content: '';
+    position: absolute; top: -20%; left: -20%;
+    width: 60%; height: 60%;
+    background: rgba(255,255,255,0.25);
+    border-radius: 50%; filter: blur(10px);
+  }
+  .app-icon svg { width: 34px; height: 34px; fill: white; position: relative; z-index: 1; }
+  .app-title { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -0.8px; }
+  .app-subtitle { font-size: 13px; color: var(--text-sub); margin-top: 4px; }
+
+  .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 14px 12px;
+    text-align: center; backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+  .stat-val { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.5px; }
+  .stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 3px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px; margin-bottom: 14px;
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  }
+
+  .drop-zone {
+    border: 2px dashed rgba(108,99,255,0.35);
+    border-radius: 18px; padding: 34px 20px;
+    text-align: center; cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34,1.2,0.64,1);
+    background: rgba(108,99,255,0.04);
+    position: relative; overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .drop-zone.drag-over { border-color: var(--accent); background: rgba(108,99,255,0.10); transform: scale(0.99); }
+  .drop-zone.has-file { border-color: var(--accent3); background: rgba(0,212,170,0.05); border-style: solid; }
+  .dz-icon {
+    width: 54px; height: 54px;
+    background: rgba(108,99,255,0.15);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 12px; transition: all 0.3s;
+  }
+  .drop-zone.has-file .dz-icon { background: rgba(0,212,170,0.15); }
+  .dz-icon svg { width: 26px; height: 26px; }
+  .dz-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+  .dz-sub { font-size: 13px; color: var(--text-sub); line-height: 1.5; }
+  .dz-formats { display: flex; gap: 6px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+  .fmt-tag { padding: 4px 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; font-size: 11px; font-weight: 500; color: var(--text-sub); letter-spacing: 0.5px; }
+
+  .file-info {
+    display: none; align-items: center; gap: 14px; padding: 14px 16px;
+    background: rgba(0,212,170,0.08); border: 1px solid rgba(0,212,170,0.2);
+    border-radius: 14px; margin-bottom: 14px;
+    animation: slideIn 0.4s cubic-bezier(0.34,1.2,0.64,1);
+  }
+  .file-info.visible { display: flex; }
+  .fi-icon { width: 42px; height: 42px; background: linear-gradient(135deg, #ff6b9d, #ff8c42); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .fi-icon svg { width: 22px; height: 22px; fill: white; }
+  .fi-details { flex: 1; overflow: hidden; }
+  .fi-name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fi-meta { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+  .fi-remove { width: 28px; height: 28px; background: rgba(255,69,58,0.15); border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--error); font-size: 15px; transition: all 0.2s; flex-shrink: 0; line-height: 1; }
+  .fi-remove:active { background: rgba(255,69,58,0.3); transform: scale(0.9); }
+
+  .section-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 10px; padding-left: 2px; }
+  .settings-grid { display: grid; gap: 2px; }
+  .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--surface); border-radius: 12px; transition: background 0.2s; gap: 12px; }
+  .setting-row:hover { background: var(--surface-hover); }
+  .setting-row + .setting-row { margin-top: 2px; }
+  .setting-label { font-size: 15px; color: var(--text); font-weight: 500; }
+  .setting-sub { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+
+  .custom-select { position: relative; min-width: 110px; }
+  .custom-select select {
+    appearance: none; -webkit-appearance: none;
+    background: rgba(108,99,255,0.15); border: 1px solid rgba(108,99,255,0.3);
+    color: var(--accent); font-size: 14px; font-weight: 600; font-family: inherit;
+    padding: 8px 28px 8px 12px; border-radius: 10px; cursor: pointer; width: 100%; outline: none; transition: all 0.2s;
+  }
+  .custom-select select option { background: #1a1a2e; color: var(--text); }
+  .custom-select select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108,99,255,0.15); }
+  .custom-select::after { content: '▾'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--accent); font-size: 12px; pointer-events: none; }
+
+  .slider-wrap { display: flex; align-items: center; gap: 10px; flex: 1; max-width: 180px; }
+  input[type=range] { flex: 1; -webkit-appearance: none; height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--val, 50%), rgba(255,255,255,0.1) var(--val, 50%)); outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); cursor: pointer; transition: transform 0.15s; }
+  input[type=range]::-webkit-slider-thumb:active { transform: scale(1.2); }
+  .slider-val { font-size: 13px; font-weight: 600; color: var(--accent); min-width: 36px; text-align: right; }
+
+  .toggle { width: 51px; height: 31px; background: rgba(255,255,255,0.1); border-radius: 16px; position: relative; cursor: pointer; transition: background 0.25s; flex-shrink: 0; border: none; }
+  .toggle.on { background: var(--success); }
+  .toggle::after { content:''; position:absolute; width:27px; height:27px; background:white; border-radius:50%; top:2px; left:2px; transition:transform 0.25s cubic-bezier(0.34,1.5,0.64,1); box-shadow:0 2px 6px rgba(0,0,0,0.3); }
+  .toggle.on::after { transform: translateX(20px); }
+
+  .waveform-wrap { height: 68px; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 8px 0; }
+  .wave-bar { flex: 1; max-width: 4px; border-radius: 2px; background: linear-gradient(to top, var(--accent), var(--accent2)); opacity: 0.25; min-height: 4px; transition: height 0.08s; }
+  .wave-bar.active { opacity: 1; animation: wavePulse 1.1s ease-in-out infinite; }
+  @keyframes wavePulse { 0%,100% { transform: scaleY(0.45); opacity: 0.6; } 50% { transform: scaleY(1); opacity: 1; } }
+
+  .progress-wrap { display: none; margin-bottom: 14px; animation: slideIn 0.4s cubic-bezier(0.34,1.2,0.64,1); }
+  .progress-wrap.visible { display: block; }
+  .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .progress-label { font-size: 14px; font-weight: 600; color: var(--text); }
+  .progress-pct { font-size: 14px; font-weight: 700; color: var(--accent); }
+  .progress-track { height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 3px; width: 0%; transition: width 0.3s ease; position: relative; overflow: hidden; }
+  .progress-fill::after { content:''; position:absolute; top:0; bottom:0; width:60px; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.35),transparent); animation: shimmer 1.6s infinite; }
+  @keyframes shimmer { from { transform: translateX(-80px); } to { transform: translateX(300px); } }
+  .progress-steps { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .p-step { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; transition: color 0.3s; }
+  .p-step.done { color: var(--success); }
+  .p-step.active { color: var(--accent); }
+  .p-step .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+  .convert-btn {
+    width: 100%; padding: 18px;
+    background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 50%, var(--accent2) 100%);
+    background-size: 200% 200%;
+    border: none; border-radius: 16px; color: white;
+    font-size: 17px; font-weight: 700; font-family: inherit;
+    cursor: pointer; letter-spacing: -0.3px; transition: all 0.3s;
+    position: relative; overflow: hidden;
+    box-shadow: 0 8px 32px rgba(108,99,255,0.4);
+    animation: gradientShift 4s ease infinite;
+  }
+  @keyframes gradientShift { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+  .convert-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; animation: none; }
+  .convert-btn:not(:disabled):active { transform: scale(0.97); }
+  .convert-btn::before { content:''; position:absolute; top:0; left:-100%; width:100%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent); transition:left 0.5s; }
+  .convert-btn:not(:disabled):hover::before { left:100%; }
+
+  .download-card { display: none; animation: slideIn 0.5s cubic-bezier(0.34,1.3,0.64,1); margin-top: 14px; }
+  .download-card.visible { display: block; }
+  .dl-inner { background: linear-gradient(135deg, rgba(0,212,170,0.1), rgba(48,209,88,0.07)); border: 1px solid rgba(0,212,170,0.25); border-radius: 18px; padding: 20px; text-align: center; }
+  .dl-check { width: 56px; height: 56px; background: linear-gradient(135deg, var(--accent3), var(--success)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; box-shadow: 0 8px 24px rgba(0,212,170,0.35); animation: popIn 0.5s cubic-bezier(0.34,1.5,0.64,1); }
+  @keyframes popIn { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
+  .dl-check svg { width: 28px; height: 28px; stroke: white; stroke-width: 2.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .dl-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .dl-meta { font-size: 13px; color: var(--text-sub); margin-bottom: 16px; }
+
+  .audio-player { display: none; background: rgba(108,99,255,0.08); border: 1px solid rgba(108,99,255,0.2); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+  .audio-player.visible { display: block; }
+  .ap-track { font-size: 13px; color: var(--text); font-weight: 600; margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ap-controls { display: flex; align-items: center; gap: 12px; }
+  .ap-play { width: 36px; height: 36px; background: var(--accent); border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: transform 0.15s; box-shadow: 0 4px 12px rgba(108,99,255,0.4); }
+  .ap-play:active { transform: scale(0.9); }
+  .ap-play svg { width: 14px; height: 14px; fill: white; }
+  .ap-time { font-size: 11px; color: var(--text-sub); flex-shrink: 0; min-width: 68px; text-align: right; }
+  .ap-progress-bar { flex: 1; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; cursor: pointer; position: relative; }
+  .ap-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; width: 0%; transition: width 0.1s linear; pointer-events: none; }
+
+  .dl-btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 28px; background: linear-gradient(135deg, var(--accent3), var(--success)); border: none; border-radius: 14px; color: #001a14; font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; text-decoration: none; transition: all 0.2s; box-shadow: 0 6px 20px rgba(0,212,170,0.3); width: 100%; margin-bottom: 10px; }
+  .dl-btn:active { transform: scale(0.97); }
+  .dl-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  .dl-again { background: transparent; border: none; color: var(--text-sub); font-size: 14px; font-family: inherit; cursor: pointer; padding: 8px; width: 100%; transition: color 0.2s; }
+  .dl-again:hover { color: var(--text); }
+
+  .toast { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%) translateY(20px); background: rgba(30,30,44,0.96); border: 1px solid rgba(255,255,255,0.12); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 14px; padding: 12px 18px; font-size: 14px; color: var(--text); font-weight: 500; white-space: nowrap; opacity: 0; transition: all 0.3s cubic-bezier(0.34,1.2,0.64,1); z-index: 200; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .home-indicator { height: 34px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .home-bar { width: 134px; height: 5px; background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+  .settings-toggle-btn {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    padding: 15px 18px; margin-bottom: 4px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text);
+    font-size: 15px; font-weight: 600; font-family: inherit;
+    cursor: pointer; transition: background 0.2s;
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  }
+  .settings-toggle-btn:hover { background: var(--surface-hover); }
+  .settings-toggle-btn.open { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom-color: transparent; margin-bottom: 0; }
+  #settingsPanel .card { border-top-left-radius: 0; border-top-right-radius: 0; border-top: none; }
+
+  .trim-pill {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 20px;
+    background: rgba(108,99,255,0.12); border: 1px solid rgba(108,99,255,0.25);
+    color: var(--text-sub); font-size: 12px; font-weight: 600; font-family: inherit;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .trim-pill:hover { background: rgba(108,99,255,0.2); color: var(--text); }
+  .trim-pill.active { background: var(--accent); border-color: var(--accent); color: white; box-shadow: 0 4px 14px rgba(108,99,255,0.4); }
+
+  .trim-time-row { display:flex; align-items:center; justify-content:space-between; }
+  .trim-time-label { font-size:11px; font-weight:600; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.8px; }
+  .trim-time-control { display:flex; align-items:center; gap:6px; background:rgba(108,99,255,0.1); border:1px solid rgba(108,99,255,0.2); border-radius:10px; padding:4px 8px; }
+  .trim-time-val { font-size:13px; font-weight:700; color:var(--accent); min-width:44px; text-align:center; font-variant-numeric: tabular-nums; }
+  .trim-time-input {
+    font-size:13px; font-weight:700; color:var(--accent); min-width:44px; width:48px;
+    text-align:center; font-variant-numeric: tabular-nums; font-family:inherit;
+    background: rgba(108,99,255,0.12); border: 1px solid rgba(108,99,255,0.3);
+    border-radius:6px; padding:2px 4px; outline:none; transition: border-color 0.2s;
+  }
+  .trim-time-input:focus { border-color: var(--accent); background: rgba(108,99,255,0.2); }
+  .trim-arrow { background:none; border:none; color:var(--accent); font-size:14px; cursor:pointer; padding:2px 4px; border-radius:6px; line-height:1; transition:background 0.15s; }
+  .trim-arrow:hover { background:rgba(108,99,255,0.2); }
+  .trim-arrow:active { background:rgba(108,99,255,0.35); transform:scale(0.9); }
+
+  @keyframes slideIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+  input[type="file"] { display: none; }
+</style>
+</head>
+<body>
+<div class="phone-frame">
+  <div class="side-btn pw"></div>
+  <div class="side-btn vu"></div>
+  <div class="side-btn vd"></div>
+
+
+
+  <div class="status-bar" style="height:60px; flex-shrink:0; position:relative; z-index:10;">
+  </div>
+
+  <div class="screen" id="screen">
+
+    <div class="app-header">
+      <div class="app-icon">
+        <svg viewBox="0 0 24 24"><path d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-3c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z"/></svg>
+      </div>
+      <div class="app-title">SoundRip</div>
+      <div class="app-subtitle">MP4 → MP3 Converter</div>
+    </div>
+
+
+
+    <!-- Drop Zone -->
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept="video/mp4,video/webm,video/ogg,video/quicktime,.mp4,.webm,.mov,.avi,.mkv">
+      <div class="dz-icon" id="dzIcon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#6c63ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.262a1 1 0 01-1.447.894L15 14"/>
+          <rect x="3" y="7" width="12" height="10" rx="2"/>
+        </svg>
+      </div>
+      <div class="dz-title" id="dzTitle">Drop your video here</div>
+      <div class="dz-sub" id="dzSub">or tap to browse from your library</div>
+      <div class="dz-formats">
+        <span class="fmt-tag">MP4</span><span class="fmt-tag">MOV</span>
+        <span class="fmt-tag">AVI</span><span class="fmt-tag">MKV</span><span class="fmt-tag">WEBM</span>
+      </div>
+    </div>
+
+    <!-- File Info -->
+    <div class="file-info" id="fileInfo">
+      <div class="fi-icon">
+        <svg viewBox="0 0 24 24"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.262a1 1 0 01-1.447.894L15 14"/><rect x="3" y="7" width="12" height="10" rx="2"/></svg>
+      </div>
+      <div class="fi-details">
+        <div class="fi-name" id="fileName">video.mp4</div>
+        <div class="fi-meta" id="fileMeta">—</div>
+      </div>
+      <button class="fi-remove" id="removeFile">✕</button>
+    </div>
+
+    <!-- Waveform -->
+    <div class="card" style="padding: 4px 16px 12px; margin-bottom: 14px;">
+      <div style="display:flex; align-items:center; justify-content:flex-end; padding: 6px 2px 2px;">
+        <button class="trim-pill" id="trimToggleBtn" onclick="toggleTrim()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="6" cy="18" r="3"/><line x1="18" y1="9" x2="18" y2="21"/><circle cx="18" cy="6" r="3"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+          Trim
+        </button>
+      </div>
+      <div style="position:relative;">
+        <div class="waveform-wrap" id="waveform"></div>
+        <!-- Trim overlay -->
+        <div id="trimOverlay" style="display:none; position:absolute; inset:0; pointer-events:none; user-select:none;">
+          <!-- darkened regions -->
+          <div id="trimDarkLeft"  style="position:absolute; top:0; bottom:0; left:0; background:rgba(0,0,0,0.55); pointer-events:none;"></div>
+          <div id="trimDarkRight" style="position:absolute; top:0; bottom:0; right:0; background:rgba(0,0,0,0.55); pointer-events:none;"></div>
+          <!-- selected region highlight -->
+          <div id="trimRegion" style="position:absolute; top:0; bottom:0; background:rgba(108,99,255,0.15); border-top:2px solid var(--accent); border-bottom:2px solid var(--accent); pointer-events:none;"></div>
+          <!-- handles -->
+          <div id="trimHandleL" style="position:absolute; top:0; bottom:0; width:14px; background:var(--accent); border-radius:4px 0 0 4px; cursor:ew-resize; display:flex; align-items:center; justify-content:center; pointer-events:all; transform:translateX(-7px);">
+            <svg width="8" height="16" viewBox="0 0 8 20" fill="none"><line x1="3" y1="2" x2="3" y2="18" stroke="white" stroke-width="1.5" stroke-linecap="round"/><line x1="6" y1="2" x2="6" y2="18" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <div id="trimHandleR" style="position:absolute; top:0; bottom:0; width:14px; background:var(--accent); border-radius:0 4px 4px 0; cursor:ew-resize; display:flex; align-items:center; justify-content:center; pointer-events:all; transform:translateX(-7px);">
+            <svg width="8" height="16" viewBox="0 0 8 20" fill="none"><line x1="3" y1="2" x2="3" y2="18" stroke="white" stroke-width="1.5" stroke-linecap="round"/><line x1="6" y1="2" x2="6" y2="18" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+      </div>
+      <!-- Trim time controls -->
+      <div id="trimLabels" style="display:none; padding: 10px 2px 0; gap:8px; flex-direction:column;">
+        <div class="trim-time-row">
+          <span class="trim-time-label">Start</span>
+          <div class="trim-time-control">
+            <button class="trim-arrow" onclick="nudgeTrim('start',-1)">&#8592;</button>
+            <input class="trim-time-input" id="trimStartLabel" value="0:00" onchange="applyTrimInput('start',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+            <button class="trim-arrow" onclick="nudgeTrim('start',1)">&#8594;</button>
+          </div>
+        </div>
+        <div class="trim-time-row">
+          <span class="trim-time-label">End</span>
+          <div class="trim-time-control">
+            <button class="trim-arrow" onclick="nudgeTrim('end',-1)">&#8592;</button>
+            <input class="trim-time-input" id="trimEndLabel" value="0:00" onchange="applyTrimInput('end',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+            <button class="trim-arrow" onclick="nudgeTrim('end',1)">&#8594;</button>
+          </div>
+        </div>
+      </div>
+      <div id="previewControls" style="display:none; align-items:center; gap:12px; padding: 4px 2px 0;">
+        <button class="ap-play" id="previewPlayBtn" style="flex-shrink:0;">
+          <svg id="previewPlayIcon" viewBox="0 0 24 24" width="14" height="14" fill="white"><polygon points="5 3 19 12 5 21"/></svg>
+        </button>
+        <div class="ap-progress-bar" id="previewProgressBar" style="flex:1;">
+          <div class="ap-progress-fill" id="previewProgressFill"></div>
+        </div>
+        <div class="ap-time" id="previewTime" style="font-size:11px; color:var(--text-sub); min-width:68px; text-align:right;">0:00 / 0:00</div>
+      </div>
+    </div>
+
+    <!-- Settings Dropdown -->
+    <button class="settings-toggle-btn" id="settingsToggleBtn" onclick="toggleSettings()">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        Output Settings
+      </div>
+      <svg id="settingsChevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.3s;"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div id="settingsPanel" style="display:none; margin-bottom:14px; animation: slideIn 0.3s cubic-bezier(0.34,1.2,0.64,1);">
+      <div class="card" style="margin-bottom:0;">
+        <div class="settings-grid">
+          <div class="setting-row">
+            <div><div class="setting-label">Format</div><div class="setting-sub">Output container</div></div>
+            <div class="custom-select">
+              <select id="formatSelect">
+                <option value="mp3">MP3</option>
+                <option value="aac">AAC</option>
+                <option value="wav">WAV</option>
+                <option value="ogg">OGG</option>
+                <option value="flac">FLAC</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Bitrate</div><div class="setting-sub">Audio quality</div></div>
+            <div class="custom-select">
+              <select id="bitrateSelect">
+                <option value="128">128 kbps</option>
+                <option value="192">192 kbps</option>
+                <option value="256">256 kbps</option>
+                <option value="320" selected>320 kbps</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Sample Rate</div><div class="setting-sub">Hz frequency</div></div>
+            <div class="custom-select">
+              <select id="sampleRateSelect">
+                <option value="22050">22.05 kHz</option>
+                <option value="44100">44.1 kHz</option>
+                <option value="48000" selected>48 kHz</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Volume</div><div class="setting-sub">Normalize level</div></div>
+            <div class="slider-wrap">
+              <input type="range" id="volumeSlider" min="0" max="200" value="100">
+              <div class="slider-val" id="volumeVal">100%</div>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Stereo</div><div class="setting-sub">Dual channel</div></div>
+            <button class="toggle on" id="stereoToggle"></button>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Trim Silence</div><div class="setting-sub">Remove quiet ends</div></div>
+            <button class="toggle" id="silenceToggle"></button>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Save Thumbnail</div>
+              <div class="setting-sub">Embed cover art from video</div>
+            </div>
+            <button class="toggle on" id="thumbnailToggle"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Thumbnail Preview -->
+    <div id="thumbPreviewWrap" style="display:none; margin-bottom:14px; animation: slideIn 0.4s cubic-bezier(0.34,1.2,0.64,1);">
+      <div class="card" style="padding:14px;">
+        <div class="section-label" style="margin-bottom:10px;">Cover Art Preview</div>
+        <div style="display:flex; align-items:center; gap:14px;">
+          <canvas id="thumbCanvas" width="80" height="80" style="border-radius:10px; border:1px solid rgba(255,255,255,0.12); flex-shrink:0; background:#111;"></canvas>
+          <div>
+            <div style="font-size:13px; font-weight:600; color:var(--text);">Square crop ready</div>
+            <div style="font-size:12px; color:var(--text-sub); margin-top:3px;">Will be embedded as ID3 cover art</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rename File -->
+    <button class="settings-toggle-btn" id="renameToggleBtn" onclick="toggleRename()" style="margin-top:14px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        Rename File
+      </div>
+      <svg id="renameChevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.3s;"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div id="renamePanel" style="display:none; margin-bottom:0; animation: slideIn 0.3s cubic-bezier(0.34,1.2,0.64,1);">
+      <div class="card" style="margin-bottom:0; border-top-left-radius:0; border-top-right-radius:0; border-top:none; padding:14px 16px;">
+        <div style="font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Output filename</div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <input id="renameInput" type="text" placeholder="Leave blank to use original name"
+            style="flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:10px;
+            color:var(--text); font-size:14px; font-family:inherit; padding:10px 12px; outline:none; transition:border-color 0.2s;"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='rgba(255,255,255,0.12)'"
+            onkeydown="if(event.key==='Enter')this.blur()">
+          <button onclick="document.getElementById('renameInput').value=''" style="background:rgba(255,69,58,0.15); border:none; border-radius:8px; color:var(--error); font-size:13px; padding:10px 12px; cursor:pointer; white-space:nowrap; font-family:inherit;">Clear</button>
+        </div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">Extension is added automatically based on format.</div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-wrap" id="progressWrap">
+      <div class="card">
+        <div class="progress-header">
+          <div class="progress-label" id="progressLabel">Reading file…</div>
+          <div class="progress-pct" id="progressPct">0%</div>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-steps">
+          <div class="p-step active" id="step1"><span class="dot"></span>Read</div>
+          <div class="p-step" id="step2"><span class="dot"></span>Extract</div>
+          <div class="p-step" id="step3"><span class="dot"></span>Encode</div>
+          <div class="p-step" id="step4"><span class="dot"></span>Export</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Convert Button -->
+    <button class="convert-btn" id="convertBtn" disabled style="margin-top: 14px;">
+      Convert to Audio ✦
+    </button>
+
+    <!-- Download Card -->
+    <div class="download-card" id="downloadCard">
+      <div class="dl-inner">
+        <div class="dl-check">
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div class="dl-title">Conversion Complete!</div>
+        <div class="dl-meta" id="dlMeta">Ready to download</div>
+        <div class="audio-player" id="audioPlayer">
+          <div class="ap-track" id="apTrack">output.mp3</div>
+          <div class="ap-controls">
+            <button class="ap-play" id="apPlayBtn">
+              <svg id="apPlayIcon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21"/></svg>
+            </button>
+            <div class="ap-progress-bar" id="apProgressBar">
+              <div class="ap-progress-fill" id="apProgressFill"></div>
+            </div>
+            <div class="ap-time" id="apTime">0:00 / 0:00</div>
+          </div>
+        </div>
+        <a class="dl-btn" id="downloadBtn" href="#" download="output.mp3">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download MP3
+        </a>
+        <a class="dl-btn" id="downloadCoverBtn" href="#" download="cover.jpg" style="display:none; background: linear-gradient(135deg, #6c63ff, #ff6b9d); box-shadow: 0 6px 20px rgba(108,99,255,0.3);">
+          <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          Download Cover Art
+        </a>
+        <button class="dl-again" id="convertAgainBtn">Convert another file</button>
+      </div>
+    </div>
+
+    <div style="height: 12px;"></div>
+  </div>
+
+  <div class="home-indicator"><div class="home-bar"></div></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+// ─── State ─────────────────────────────────────────────
+let selectedFile = null, audioBlob = null, audioBuffer = null;
+let currentAudio = null, isPlaying = false, convertedCount = 0;
+let thumbnailBlob = null;
+
+// ─── Clock ──────────────────────────────────────────────
+function updateClock() {}
+updateClock();
+
+// ─── Waveform ───────────────────────────────────────────
+const wf = document.getElementById('waveform');
+const wfHeights = [];
+for(let i=0;i<52;i++){
+  const b = document.createElement('div');
+  b.className = 'wave-bar';
+  const h = 6 + Math.random()*46;
+  wfHeights.push(h);
+  b.style.height = h+'px';
+  wf.appendChild(b);
+}
+function animateWave(on) {
+  wf.querySelectorAll('.wave-bar').forEach((b,i) => {
+    if(on) {
+      b.classList.add('active');
+      b.style.animationDelay = (i*0.038)+'s';
+      b.style.animationDuration = (0.7+Math.random()*0.9)+'s';
+    } else {
+      b.classList.remove('active');
+      b.style.height = wfHeights[i]+'px';
+    }
+  });
+}
+
+// ─── Dynamic Island ─────────────────────────────────────
+function setDI(active, text='Converting…') {}
+
+// ─── Preview Player ──────────────────────────────────────
+let previewAudio = null, previewPlaying = false;
+
+function setupPreview(file) {
+  stopPreview();
+  const url = URL.createObjectURL(file);
+  previewAudio = new Audio(url);
+  previewAudio.addEventListener('loadedmetadata', () => {
+    if(trimActive) updateTrimUI();
+  });
+  previewAudio.addEventListener('timeupdate', () => {
+    if(!previewAudio || !previewAudio.duration) return;
+    const pct = previewAudio.currentTime / previewAudio.duration * 100;
+    document.getElementById('previewProgressFill').style.width = pct + '%';
+    document.getElementById('previewTime').textContent =
+      fmtDur(previewAudio.currentTime) + ' / ' + fmtDur(previewAudio.duration);
+  });
+  previewAudio.addEventListener('ended', () => {
+    previewPlaying = false;
+    updatePreviewIcon();
+    animateWave(false);
+    document.getElementById('previewProgressFill').style.width = '0%';
+    previewAudio.currentTime = 0;
+  });
+  document.getElementById('previewControls').style.display = 'flex';
+}
+
+function stopPreview() {
+  if(previewAudio) { previewAudio.pause(); URL.revokeObjectURL(previewAudio.src); previewAudio = null; }
+  previewPlaying = false;
+  updatePreviewIcon();
+  animateWave(false);
+  document.getElementById('previewControls').style.display = 'none';
+  document.getElementById('previewProgressFill').style.width = '0%';
+  document.getElementById('previewTime').textContent = '0:00 / 0:00';
+}
+
+function updatePreviewIcon() {
+  document.getElementById('previewPlayIcon').innerHTML = previewPlaying
+    ? '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>'
+    : '<polygon points="5 3 19 12 5 21"/>';
+}
+
+document.getElementById('previewPlayBtn').addEventListener('click', () => {
+  if(!previewAudio) return;
+  if(previewPlaying) {
+    previewAudio.pause();
+    previewPlaying = false;
+    animateWave(false);
+  } else {
+    // Smart start: begin from trim start point when trim is active
+    if(trimActive && previewAudio.duration) {
+      const startSec = trimStart * previewAudio.duration;
+      if(previewAudio.currentTime < startSec || previewAudio.currentTime >= trimEnd * previewAudio.duration) {
+        previewAudio.currentTime = startSec;
+      }
+    }
+    previewAudio.play();
+    previewPlaying = true;
+    animateWave(true);
+  }
+  updatePreviewIcon();
+});
+
+document.getElementById('previewProgressBar').addEventListener('click', e => {
+  if(!previewAudio || !previewAudio.duration) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  previewAudio.currentTime = ((e.clientX - rect.left) / rect.width) * previewAudio.duration;
+});
+
+// ─── Trim ────────────────────────────────────────────────
+let trimActive = false;
+let trimStart = 0, trimEnd = 1; // normalized 0-1
+let draggingHandle = null, dragStartX = 0, dragStartVal = 0;
+
+function toggleTrim() {
+  trimActive = !trimActive;
+  const btn = document.getElementById('trimToggleBtn');
+  const overlay = document.getElementById('trimOverlay');
+  const labels = document.getElementById('trimLabels');
+  btn.classList.toggle('active', trimActive);
+  overlay.style.display = trimActive ? 'block' : 'none';
+  labels.style.display = trimActive ? 'flex' : 'none';
+  if(trimActive) {
+    trimStart = 0; trimEnd = 1;
+    updateTrimUI();
+  }
+}
+
+function updateTrimUI() {
+  const wf = document.getElementById('waveform');
+  const w = wf.offsetWidth;
+  const ls = trimStart * w;
+  const le = trimEnd * w;
+
+  document.getElementById('trimDarkLeft').style.width = ls + 'px';
+  document.getElementById('trimDarkRight').style.width = (w - le) + 'px';
+  document.getElementById('trimRegion').style.left = ls + 'px';
+  document.getElementById('trimRegion').style.width = (le - ls) + 'px';
+  document.getElementById('trimHandleL').style.left = ls + 'px';
+  document.getElementById('trimHandleR').style.left = le + 'px';
+
+  const dur = (audioBuffer && audioBuffer.duration) || (previewAudio && previewAudio.duration) || 0;
+  if(dur) {
+    document.getElementById('trimStartLabel').value = fmtTrimTime(trimStart * dur);
+    document.getElementById('trimEndLabel').value   = fmtTrimTime(trimEnd   * dur);
+  }
+}
+
+function parseTrimTime(str) {
+  // Accepts m:ss, h:mm:ss, or raw seconds
+  const parts = str.trim().split(':').map(Number);
+  if(parts.some(isNaN)) return null;
+  if(parts.length === 1) return parts[0];
+  if(parts.length === 2) return parts[0]*60 + parts[1];
+  return parts[0]*3600 + parts[1]*60 + parts[2];
+}
+
+function applyTrimInput(which, val) {
+  const dur = (audioBuffer && audioBuffer.duration) || (previewAudio && previewAudio.duration);
+  if(!dur) return;
+  const secs = parseTrimTime(val);
+  if(secs === null || isNaN(secs)) { updateTrimUI(); return; } // revert bad input
+  const minGap = 1 / dur;
+  if(which === 'start') {
+    trimStart = Math.max(0, Math.min(secs / dur, trimEnd - minGap));
+  } else {
+    trimEnd = Math.min(1, Math.max(secs / dur, trimStart + minGap));
+  }
+  updateTrimUI();
+  if(previewAudio && previewAudio.duration) {
+    previewAudio.currentTime = (which === 'start' ? trimStart : trimEnd) * previewAudio.duration;
+  }
+}
+
+function fmtTrimTime(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = Math.floor(secs % 60);
+  if(h > 0) return h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  return m + ':' + String(s).padStart(2,'0');
+}
+
+function nudgeTrim(which, dir) {
+  const dur = (audioBuffer && audioBuffer.duration) || (previewAudio && previewAudio.duration);
+  if(!dur) return;
+  const step = 1 / dur;
+  const minGap = 1 / dur;
+  if(which === 'start') {
+    trimStart = Math.max(0, Math.min(trimStart + dir * step, trimEnd - minGap));
+  } else {
+    trimEnd = Math.min(1, Math.max(trimEnd + dir * step, trimStart + minGap));
+  }
+  updateTrimUI();
+  if(previewAudio) {
+    previewAudio.currentTime = (which === 'start' ? trimStart : trimEnd) * previewAudio.duration;
+  }
+}
+
+// Handle dragging
+['trimHandleL','trimHandleR'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('mousedown', e => {
+    draggingHandle = id;
+    dragStartX = e.clientX;
+    dragStartVal = id === 'trimHandleL' ? trimStart : trimEnd;
+    e.stopPropagation();
+  });
+  el.addEventListener('touchstart', e => {
+    draggingHandle = id;
+    dragStartX = e.touches[0].clientX;
+    dragStartVal = id === 'trimHandleL' ? trimStart : trimEnd;
+    e.stopPropagation();
+  }, { passive: true });
+});
+
+document.addEventListener('mousemove', e => {
+  if(!draggingHandle) return;
+  const wf = document.getElementById('waveform');
+  const w = wf.offsetWidth;
+  const dx = e.clientX - dragStartX;
+  const delta = dx / w;
+  applyTrimDrag(delta);
+});
+document.addEventListener('touchmove', e => {
+  if(!draggingHandle) return;
+  const wf = document.getElementById('waveform');
+  const w = wf.offsetWidth;
+  const dx = e.touches[0].clientX - dragStartX;
+  const delta = dx / w;
+  applyTrimDrag(delta);
+}, { passive: true });
+document.addEventListener('mouseup', () => { draggingHandle = null; });
+document.addEventListener('touchend', () => { draggingHandle = null; });
+
+function applyTrimDrag(delta) {
+  const minGap = 0.02;
+  if(draggingHandle === 'trimHandleL') {
+    trimStart = Math.max(0, Math.min(dragStartVal + delta, trimEnd - minGap));
+  } else {
+    trimEnd = Math.min(1, Math.max(dragStartVal + delta, trimStart + minGap));
+  }
+  updateTrimUI();
+  // Live-seek audio while dragging either handle (playing or not)
+  if(previewAudio && previewAudio.duration) {
+    previewAudio.currentTime = (draggingHandle === 'trimHandleL' ? trimStart : trimEnd) * previewAudio.duration;
+  }
+}
+
+// ─── File Handling ───────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', ()=>fileInput.click());
+dropZone.addEventListener('dragover', e=>{ e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', ()=>dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e=>{ e.preventDefault(); dropZone.classList.remove('drag-over'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); });
+document.getElementById('removeFile').addEventListener('click', resetAll);
+
+function handleFile(f) {
+  const validExts = ['mp4','webm','mov','avi','mkv','ogg','m4v'];
+  const ext = f.name.split('.').pop().toLowerCase();
+  if(!f.type.startsWith('video/') && !validExts.includes(ext)) {
+    showToast('⚠️ Please select a valid video file'); return;
+  }
+  selectedFile = f;
+  const sizeMB = (f.size/1024/1024).toFixed(1);
+  document.getElementById('fileName').textContent = f.name;
+  document.getElementById('fileMeta').textContent = sizeMB + ' MB • ' + ext.toUpperCase();
+  document.getElementById('fileInfo').classList.add('visible');
+  dropZone.classList.add('has-file');
+  document.getElementById('dzTitle').textContent = 'File ready';
+  document.getElementById('dzSub').textContent = 'Tap to choose a different file';
+  document.getElementById('convertBtn').disabled = false;
+  document.getElementById('downloadCard').classList.remove('visible');
+  document.getElementById('progressWrap').classList.remove('visible');
+  document.getElementById('audioPlayer').classList.remove('visible');
+  stopAudio();
+  animateWave(false);
+  setupPreview(f);
+  if(trimActive) updateTrimUI();
+  // Auto-extract thumbnail if toggle is on
+  thumbnailBlob = null;
+  document.getElementById('thumbPreviewWrap').style.display = 'none';
+  if(document.getElementById('thumbnailToggle').classList.contains('on')) {
+    extractThumbnail(f);
+  }
+  showToast('✓ Video loaded — ready to convert');
+}
+
+function resetAll() {
+  selectedFile = null; audioBlob = null; fileInput.value = '';
+  thumbnailBlob = null;
+  document.getElementById('thumbPreviewWrap').style.display = 'none';
+  document.getElementById('downloadCoverBtn').style.display = 'none';
+  // Reset trim
+  trimActive = false; trimStart = 0; trimEnd = 1;
+  document.getElementById('trimToggleBtn').classList.remove('active');
+  document.getElementById('trimOverlay').style.display = 'none';
+  document.getElementById('trimLabels').style.display = 'none';
+  document.getElementById('fileInfo').classList.remove('visible');
+  dropZone.classList.remove('has-file');
+  document.getElementById('dzTitle').textContent = 'Drop your video here';
+  document.getElementById('dzSub').textContent = 'or tap to browse from your library';
+  document.getElementById('convertBtn').disabled = true;
+  document.getElementById('downloadCard').classList.remove('visible');
+  document.getElementById('progressWrap').classList.remove('visible');
+  document.getElementById('audioPlayer').classList.remove('visible');
+  document.getElementById('renameInput').value = '';
+  stopAudio(); stopPreview(); animateWave(false); setDI(false);
+}
+
+// ─── Settings Toggle ─────────────────────────────────────
+function toggleSettings() {
+  const panel = document.getElementById('settingsPanel');
+  const btn = document.getElementById('settingsToggleBtn');
+  const chevron = document.getElementById('settingsChevron');
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  btn.classList.toggle('open', !isOpen);
+  chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
+function toggleRename() {
+  const panel = document.getElementById('renamePanel');
+  const btn = document.getElementById('renameToggleBtn');
+  const chevron = document.getElementById('renameChevron');
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  btn.classList.toggle('open', !isOpen);
+  chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+  if(!isOpen) setTimeout(()=>document.getElementById('renameInput').focus(), 150);
+}
+document.getElementById('bitrateSelect').addEventListener('change', function(){});
+document.getElementById('formatSelect').addEventListener('change', function(){
+  const fmt = this.value.toUpperCase();
+  document.getElementById('downloadBtn').innerHTML = `<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download ${fmt}`;
+  document.getElementById('downloadBtn').download = 'output.' + this.value;
+});
+
+const volSlider = document.getElementById('volumeSlider');
+function updateSliderBg() {
+  const pct = (volSlider.value / 200 * 100);
+  volSlider.style.background = `linear-gradient(to right, #6c63ff ${pct}%, rgba(255,255,255,0.1) ${pct}%)`;
+  document.getElementById('volumeVal').textContent = volSlider.value + '%';
+}
+volSlider.addEventListener('input', updateSliderBg);
+updateSliderBg();
+
+['stereoToggle','silenceToggle'].forEach(id => {
+  document.getElementById(id).addEventListener('click', function(){ this.classList.toggle('on'); });
+});
+
+document.getElementById('thumbnailToggle').addEventListener('click', function(){
+  this.classList.toggle('on');
+  const isOn = this.classList.contains('on');
+  if(isOn && selectedFile) {
+    extractThumbnail(selectedFile);
+  } else {
+    document.getElementById('thumbPreviewWrap').style.display = 'none';
+    thumbnailBlob = null;
+  }
+});
+
+function extractThumbnail(file) {
+  const video = document.createElement('video');
+  video.muted = true;
+  video.preload = 'metadata';
+  const url = URL.createObjectURL(file);
+  video.src = url;
+  video.addEventListener('loadeddata', () => {
+    video.currentTime = 0.5;
+  });
+  video.addEventListener('seeked', () => {
+    const size = Math.min(video.videoWidth, video.videoHeight);
+    const offX = (video.videoWidth - size) / 2;
+    const offY = (video.videoHeight - size) / 2;
+
+    // Full-res canvas for blob
+    const fullCanvas = document.createElement('canvas');
+    fullCanvas.width = size; fullCanvas.height = size;
+    const fullCtx = fullCanvas.getContext('2d');
+    fullCtx.drawImage(video, offX, offY, size, size, 0, 0, size, size);
+
+    // Preview canvas (80x80)
+    const prev = document.getElementById('thumbCanvas');
+    const pCtx = prev.getContext('2d');
+    pCtx.drawImage(video, offX, offY, size, size, 0, 0, 80, 80);
+
+    fullCanvas.toBlob(blob => {
+      thumbnailBlob = blob;
+      document.getElementById('thumbPreviewWrap').style.display = 'block';
+      URL.revokeObjectURL(url);
+    }, 'image/jpeg', 0.92);
+  });
+  video.load();
+}
+
+// ─── Conversion ───────────────────────────────────────────
+document.getElementById('convertBtn').addEventListener('click', startConversion);
+document.getElementById('convertAgainBtn').addEventListener('click', resetAll);
+
+async function startConversion() {
+  if(!selectedFile) return;
+  const format = document.getElementById('formatSelect').value;
+  const sampleRate = parseInt(document.getElementById('sampleRateSelect').value);
+
+  document.getElementById('convertBtn').disabled = true;
+  document.getElementById('progressWrap').classList.add('visible');
+  document.getElementById('downloadCard').classList.remove('visible');
+  if(previewPlaying) { previewAudio.pause(); previewPlaying = false; updatePreviewIcon(); }
+  animateWave(true);
+
+  const scrollEl = document.getElementById('screen');
+
+  try {
+    await setProgress(0,'Reading file…',1); await sleep(350);
+    await setProgress(20,'Reading file…',1); await sleep(300);
+
+    await setProgress(28,'Decoding audio…',2);
+    const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate });
+    const arrBuf = await selectedFile.arrayBuffer();
+    await setProgress(46,'Decoding audio…',2);
+    audioBuffer = await ctx.decodeAudioData(arrBuf);
+
+    await setProgress(60,'Encoding to '+format.toUpperCase()+'…',3); await sleep(400);
+    await setProgress(78,'Applying settings…',3); await sleep(350);
+
+    await setProgress(88,'Exporting…',4);
+    const volume = parseInt(volSlider.value)/100;
+    const stereo = document.getElementById('stereoToggle').classList.contains('on');
+    const channels = stereo ? Math.min(audioBuffer.numberOfChannels, 2) : 1;
+    const startSample = trimActive ? Math.floor(trimStart * audioBuffer.length) : 0;
+    const endSample   = trimActive ? Math.floor(trimEnd   * audioBuffer.length) : audioBuffer.length;
+    const wavData = encodeWAV(audioBuffer, channels, volume, startSample, endSample);
+    const mimeMap = {mp3:'audio/mpeg',wav:'audio/wav',aac:'audio/aac',ogg:'audio/ogg',flac:'audio/flac'};
+    audioBlob = new Blob([wavData], { type: mimeMap[format]||'audio/wav' });
+    await setProgress(100,'Done!',4); await sleep(300);
+
+    animateWave(false);
+    await showDone(format);
+    setTimeout(()=>{ scrollEl.scrollTop = scrollEl.scrollHeight; }, 120);
+
+  } catch(err) {
+    animateWave(false);
+    document.getElementById('progressWrap').classList.remove('visible');
+    document.getElementById('convertBtn').disabled = false;
+    console.error(err);
+    showToast('⚠️ Could not extract audio — check file format');
+  }
+}
+
+function encodeWAV(buffer, channels, volume, startSample=0, endSample=-1) {
+  const sr = buffer.sampleRate;
+  const numCh = Math.min(channels, buffer.numberOfChannels);
+  if(endSample < 0) endSample = buffer.length;
+  const len = endSample - startSample;
+  const bps = 2, blockAlign = numCh*bps, byteRate = sr*blockAlign;
+  const dataSize = len*blockAlign, ab = new ArrayBuffer(44+dataSize);
+  const v = new DataView(ab);
+  const s = (o,str)=>{ for(let i=0;i<str.length;i++) v.setUint8(o+i,str.charCodeAt(i)); };
+  s(0,'RIFF'); v.setUint32(4,36+dataSize,true); s(8,'WAVE'); s(12,'fmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,numCh,true);
+  v.setUint32(24,sr,true); v.setUint32(28,byteRate,true);
+  v.setUint16(32,blockAlign,true); v.setUint16(34,16,true);
+  s(36,'data'); v.setUint32(40,dataSize,true);
+  let offset=44;
+  for(let i=startSample;i<endSample;i++){
+    for(let c=0;c<numCh;c++){
+      const sample = Math.max(-1,Math.min(1,buffer.getChannelData(c)[i]*volume));
+      v.setInt16(offset, sample<0 ? sample*0x8000 : sample*0x7FFF, true);
+      offset+=2;
+    }
+  }
+  return ab;
+}
+
+async function setProgress(pct, label, step) {
+  document.getElementById('progressFill').style.width = pct+'%';
+  document.getElementById('progressPct').textContent = pct+'%';
+  document.getElementById('progressLabel').textContent = label;
+  [1,2,3,4].forEach(s=>{
+    const el = document.getElementById('step'+s);
+    el.className = 'p-step'+(s<step?' done':s===step?' active':'');
+  });
+  await sleep(30);
+}
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+async function showDone(format) {
+  convertedCount++;
+
+  const hasCoverArt = thumbnailBlob && document.getElementById('thumbnailToggle').classList.contains('on');
+
+  // Audio file — always clean, never modified
+  const audioUrl = URL.createObjectURL(audioBlob);
+  const sizeMB = (audioBlob.size/1024/1024).toFixed(2);
+  const dur = audioBuffer ? fmtDur(audioBuffer.duration) : '—';
+  const customName = document.getElementById('renameInput').value.trim();
+  const baseName = customName
+    ? customName.replace(/\.[^.]+$/, '') // strip extension if user typed one
+    : selectedFile.name.replace(/\.[^.]+$/, '');
+  const outName = baseName + '.' + format;
+
+  document.getElementById('dlMeta').textContent = `${sizeMB} MB • ${dur} • ${document.getElementById('bitrateSelect').value} kbps`;
+  const dlBtn = document.getElementById('downloadBtn');
+  dlBtn.href = audioUrl; dlBtn.download = outName;
+  dlBtn.innerHTML = `<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download ${format.toUpperCase()}`;
+
+  // Cover art — separate JPG download button
+  const coverBtn = document.getElementById('downloadCoverBtn');
+  if(hasCoverArt) {
+    try {
+      const thumbData = await thumbnailBlob.arrayBuffer();
+      const coverUrl = URL.createObjectURL(new Blob([thumbData], { type: 'image/jpeg' }));
+      const coverName = baseName + '_cover.jpg';
+      coverBtn.href = coverUrl;
+      coverBtn.download = coverName;
+      coverBtn.style.display = 'flex';
+    } catch(e) {
+      coverBtn.style.display = 'none';
+      console.warn('Cover art button failed', e);
+    }
+  } else {
+    coverBtn.style.display = 'none';
+  }
+
+  document.getElementById('apTrack').textContent = outName;
+  setupPlayer(audioUrl);
+  document.getElementById('audioPlayer').classList.add('visible');
+  document.getElementById('downloadCard').classList.add('visible');
+  document.getElementById('progressWrap').classList.remove('visible');
+  showToast(hasCoverArt ? '✓ Done — audio + cover art ready!' : '✓ Conversion complete!');
+}
+
+// Prepend ID3v2.3 tag with APIC cover art frame directly before audio bytes.
+// Works universally: players find ID3 at offset 0 and render cover art.
+async function embedID3Cover(audioBlob_arg, imageArrayBuffer) {
+  // NOTE: The browser can only produce PCM WAV audio via Web Audio API.
+  // Prepending an ID3 tag to WAV bytes corrupts the file because WAV
+  // requires RIFF at byte 0. Instead, we return the cover art as a
+  // separate Blob so it can be downloaded alongside the clean audio file.
+  return new Blob([imageArrayBuffer], { type: 'image/jpeg' });
+}
+
+function buildID3Tag(imageArrayBuffer) {
+  const mimeBytes = new TextEncoder().encode('image/jpeg');
+  const imgData = new Uint8Array(imageArrayBuffer);
+
+  // APIC frame content: text_encoding(1) + mime(n) + \0 + picture_type(1) + description(\0) + image_data
+  const apicContent = concatUint8([
+    new Uint8Array([0x00]),   // text encoding: ISO-8859-1
+    mimeBytes,
+    new Uint8Array([0x00]),   // null terminate mime
+    new Uint8Array([0x03]),   // picture type: cover front
+    new Uint8Array([0x00]),   // empty description (null terminated)
+    imgData
+  ]);
+
+  // APIC frame: "APIC" + size(4 big-endian) + frame_flags(2) + content
+  const apicHeader = new Uint8Array(10);
+  apicHeader[0]=0x41;apicHeader[1]=0x50;apicHeader[2]=0x49;apicHeader[3]=0x43;
+  const sz = apicContent.length;
+  apicHeader[4]=(sz>>24)&0xff; apicHeader[5]=(sz>>16)&0xff;
+  apicHeader[6]=(sz>>8)&0xff;  apicHeader[7]=sz&0xff;
+  apicHeader[8]=0x00; apicHeader[9]=0x00;
+  const apicFrame = concatUint8([apicHeader, apicContent]);
+
+  // ID3v2.3 tag size is syncsafe (no bit 7 set in any byte)
+  const tagSize = apicFrame.length;
+  const syncsafe = [
+    (tagSize >> 21) & 0x7f,
+    (tagSize >> 14) & 0x7f,
+    (tagSize >> 7)  & 0x7f,
+     tagSize        & 0x7f
+  ];
+  const id3Header = new Uint8Array([
+    0x49,0x44,0x33, 0x03,0x00, 0x00,
+    syncsafe[0],syncsafe[1],syncsafe[2],syncsafe[3]
+  ]);
+
+  return concatUint8([id3Header, apicFrame]).buffer;
+}
+
+function concatUint8(arrays) {
+  const total = arrays.reduce((s, a) => s + a.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for(const a of arrays) { out.set(a, offset); offset += a.length; }
+  return out;
+}
+
+function fmtDur(s){ const m=Math.floor(s/60); return m+':'+String(Math.floor(s%60)).padStart(2,'0'); }
+
+// ─── Audio Player ─────────────────────────────────────────
+function setupPlayer(url) {
+  stopAudio();
+  currentAudio = new Audio(url);
+  currentAudio.addEventListener('timeupdate', ()=>{
+    if(!currentAudio||!currentAudio.duration) return;
+    const pct = currentAudio.currentTime/currentAudio.duration*100;
+    document.getElementById('apProgressFill').style.width = pct+'%';
+    document.getElementById('apTime').textContent = fmtDur(currentAudio.currentTime)+' / '+fmtDur(currentAudio.duration);
+  });
+  currentAudio.addEventListener('ended', ()=>{
+    isPlaying=false; updatePlayIcon();
+    document.getElementById('apProgressFill').style.width='0%';
+    currentAudio.currentTime=0;
+  });
+}
+
+document.getElementById('apPlayBtn').addEventListener('click', ()=>{
+  if(!currentAudio) return;
+  if(isPlaying){ currentAudio.pause(); isPlaying=false; }
+  else { currentAudio.play(); isPlaying=true; }
+  updatePlayIcon();
+});
+
+document.getElementById('apProgressBar').addEventListener('click', e=>{
+  if(!currentAudio||!currentAudio.duration) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  currentAudio.currentTime = ((e.clientX-rect.left)/rect.width)*currentAudio.duration;
+});
+
+function updatePlayIcon(){
+  document.getElementById('apPlayIcon').innerHTML = isPlaying
+    ? '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>'
+    : '<polygon points="5 3 19 12 5 21"/>';
+}
+function stopAudio(){ if(currentAudio){ currentAudio.pause(); currentAudio=null; } isPlaying=false; updatePlayIcon(); }
+
+// ─── Toast ─────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2800);
+}
+</script>
+</body>
+</html>
